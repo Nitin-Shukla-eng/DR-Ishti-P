@@ -1,0 +1,6 @@
+*.autosave
+*.asv
+slprj/
+*.slxc
+data/
+resources/project/
