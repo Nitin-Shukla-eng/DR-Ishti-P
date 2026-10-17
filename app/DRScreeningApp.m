@@ -5,6 +5,10 @@ function DRScreeningApp()
 %
 %   Requires models/dr_classifier_binary.mat (trained in Phase 4) to
 %   exist and be on the MATLAB path, or update MODEL_PATH below.
+%
+%   Optional: set TINYFISH_API_KEY (setenv) to show nearby eye-care
+%   referral resources for non-low-risk results. The app works fully
+%   without it.
 
     MODEL_PATH = fullfile('models', 'dr_classifier_binary.mat');
 
@@ -20,12 +24,17 @@ function DRScreeningApp()
     axCam = uiaxes(fig, 'Position', [400 250 350 330]);
     title(axCam, 'Grad-CAM Attention');
 
-    resultArea = uitextarea(fig, 'Position', [30 30 720 200], ...
+    resultArea = uitextarea(fig, 'Position', [30 30 890 200], ...
         'Editable', 'off', 'FontSize', 13, ...
         'Value', {'Upload a fundus image to begin screening.'});
 
     uploadBtn = uibutton(fig, 'Text', 'Upload Fundus Image', ...
         'Position', [770 560 150 40], 'FontSize', 13);
+
+    uilabel(fig, 'Text', 'City / district (referral search):', ...
+        'FontSize', 11, 'Position', [770 525 175 22]);
+    cityField = uieditfield(fig, 'text', 'Position', [770 495 150 28], ...
+        'Placeholder', 'e.g. Pune');
 
     netHolder = struct('net', []); % simple closure-captured state
 
@@ -78,6 +87,34 @@ function DRScreeningApp()
             'NOTE: Prototype demo. Risk label is a confidence-based proxy,', ...
             'not a clinically validated ICDR 0-4 grade.'
         };
+
+        % --- Optional referral lookup (TinyFish Search) for non-low-risk results ---
+        if ~startsWith(string(result.riskLabel), "Low")
+            resultArea.Value = [lines, {'', 'Looking up referral resources...'}];
+            drawnow;
+            lines = [lines, referralLines(cityField.Value)];
+        end
+
         resultArea.Value = lines;
+    end
+
+    function out = referralLines(city)
+        % Builds the referral section; never throws, so the app keeps working
+        % offline or without an API key.
+        out = {''};
+        try
+            info = getReferralInfo(city, 3);
+        catch ME
+            info = struct('ok', false, 'message', string(ME.message), 'items', []);
+        end
+        if info.ok
+            out{end+1} = 'Referral resources (TinyFish Search, verify before use):';
+            for k = 1:numel(info.items)
+                out{end+1} = char(sprintf('  %d. %s', k, info.items(k).title));
+                out{end+1} = char(sprintf('     %s', info.items(k).url));
+            end
+        else
+            out{end+1} = char(info.message);
+        end
     end
 end
