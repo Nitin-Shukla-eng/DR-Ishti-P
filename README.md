@@ -81,10 +81,6 @@ See `reports/test_report.png` and the figure above for the evaluation on the tes
 - Trained on a single public dataset, so performance on other cameras and populations is untested.
 - Built as a one-day prototype and not clinically validated.
 
-## Author
-
-Nitin Kumar Shukla, B.Tech ECE, USICT, GGSIPU.
-
 ## Acknowledgements
 
 APTOS 2019 dataset (Asia Pacific Tele-Ophthalmology Society) and MathWorks tools used for development.
