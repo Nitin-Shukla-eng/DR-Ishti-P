@@ -6,9 +6,20 @@ function DRScreeningApp()
 %   Requires models/dr_classifier_binary.mat (trained in Phase 4) to
 %   exist and be on the MATLAB path, or update MODEL_PATH below.
 %
-%   Optional: set TINYFISH_API_KEY (setenv) to show nearby eye-care
-%   referral resources for non-low-risk results. The app works fully
-%   without it.
+%   Optional TinyFish features (bring your own key, click "Set TinyFish
+%   API key" or setenv('TINYFISH_API_KEY', ...)). For non-low-risk results:
+%     1. Referral resources (Search API)                 -> getReferralInfo
+%     2. Human-review evidence from PubMed / AIOS        -> ishtiLiteratureCheck
+%     3. PM-JAY empanelled eye hospitals near the camp   -> ishtiFindPMJAYHospitals
+%   Only a generic topic and the camp's district/state/pincode are sent.
+%   No images or patient data leave MATLAB. The app works fully without a key.
+
+    % Make the TinyFish helper functions visible regardless of current folder
+    appDir = fileparts(mfilename('fullpath'));
+    for sub = {fullfile('..', 'src'), fullfile('..', 'src', 'tinyfish')}
+        d = fullfile(appDir, sub{1});
+        if isfolder(d), addpath(d); end
+    end
 
     MODEL_PATH = fullfile('models', 'dr_classifier_binary.mat');
 
@@ -31,14 +42,34 @@ function DRScreeningApp()
     uploadBtn = uibutton(fig, 'Text', 'Upload Fundus Image', ...
         'Position', [770 560 150 40], 'FontSize', 13);
 
-    uilabel(fig, 'Text', 'City / district (referral search):', ...
+    uilabel(fig, 'Text', 'Camp location (referral search):', ...
         'FontSize', 11, 'Position', [770 525 175 22]);
     cityField = uieditfield(fig, 'text', 'Position', [770 495 150 28], ...
-        'Placeholder', 'e.g. Pune');
+        'Placeholder', 'District, e.g. Pune');
+    stateField = uieditfield(fig, 'text', 'Position', [770 465 150 28], ...
+        'Placeholder', 'State (optional)');
+    pinField = uieditfield(fig, 'text', 'Position', [770 435 150 28], ...
+        'Placeholder', 'Pincode (optional)');
+
+    keyBtn = uibutton(fig, 'Text', 'Set TinyFish API key', ...
+        'Position', [770 390 150 30], 'FontSize', 11);
+    keyBtn.ButtonPushedFcn = @(btn, event) onSetKey();
 
     netHolder = struct('net', []); % simple closure-captured state
 
     uploadBtn.ButtonPushedFcn = @(btn, event) onUpload();
+
+    function onSetKey()
+        a = inputdlg({['Paste your own TinyFish API key ' ...
+            '(agent.tinyfish.ai/api-keys). It is kept for this MATLAB ' ...
+            'session only and never saved to a file.']}, ...
+            'TinyFish API key', [1 70]);
+        if ~isempty(a) && ~isempty(strtrim(a{1}))
+            setenv('TINYFISH_API_KEY', strtrim(a{1}));
+            uialert(fig, 'TinyFish key set for this MATLAB session.', ...
+                'TinyFish', 'Icon', 'success');
+        end
+    end
 
     function onUpload()
         [file, path] = uigetfile({'*.png;*.jpg;*.jpeg', 'Fundus Images'});
@@ -88,11 +119,14 @@ function DRScreeningApp()
             'not a clinically validated ICDR 0-4 grade.'
         };
 
-        % --- Optional referral lookup (TinyFish Search) for non-low-risk results ---
+        % --- Optional TinyFish lookups for non-low-risk results ---
         if ~startsWith(string(result.riskLabel), "Low")
-            resultArea.Value = [lines, {'', 'Looking up referral resources...'}];
+            resultArea.Value = [lines, {'', ...
+                'Looking up referral resources and evidence (can take a minute)...'}];
             drawnow;
             lines = [lines, referralLines(cityField.Value)];
+            lines = [lines, tinyfishLines(result, cityField.Value, ...
+                stateField.Value, pinField.Value)];
         end
 
         resultArea.Value = lines;
@@ -116,5 +150,41 @@ function DRScreeningApp()
         else
             out{end+1} = char(info.message);
         end
+    end
+
+    function out = tinyfishLines(result, district, state, pin)
+        % Human-review evidence (PubMed/AIOS) + PM-JAY eye hospitals.
+        % Never throws; silently skipped when no key is set.
+        out = {''};
+        key = tinyfishKey(false);          % no pop-up in the middle of a screening
+        if isempty(key)
+            out{end+1} = 'Tip: click "Set TinyFish API key" to add evidence lookup and PM-JAY eye-hospital search.';
+            return;
+        end
+        hasLocation = ~isempty(strtrim(district)) || ~isempty(strtrim(pin));
+        try
+            tf = ishtiTinyFishReport(conflictTypeFor(result), district, ...
+                'Pincode', pin, 'State', state, 'Key', key, ...
+                'SkipHospitals', ~hasLocation);
+            out = [out, tf.lines(:)'];
+        catch ME
+            out{end+1} = ['TinyFish extras unavailable: ' ME.message];
+        end
+        if ~hasLocation
+            out{end+1} = 'Enter a district or pincode to also find PM-JAY empanelled eye hospitals.';
+        end
+    end
+end
+
+function c = conflictTypeFor(result)
+% Maps the current binary pipeline output to a generic, PHI-free topic.
+% This is a proxy: DR predicted -> referral guidance; "No DR" but a
+% non-low risk (uncertain) -> grade-vs-lesion discordance evidence.
+    lbl = lower(string(result.label));
+    isDR = (contains(lbl, "dr") || contains(lbl, "retinopathy")) && ~contains(lbl, "no");
+    if isDR
+        c = 'ReferableConfirmed';
+    else
+        c = 'GradeZeroLesionPresent';
     end
 end

@@ -6,7 +6,7 @@ A MATLAB prototype for screening diabetic retinopathy (DR) from retinal fundus i
 
 > **Disclaimer:** This is a research and educational prototype. It is not a medical device and must not be used for clinical diagnosis.
 
-![Results](graph.png)
+[![Results](https://github.com/Nitin-Shukla-eng/DR-Ishti-P/raw/main/graph.png)](graph.png)
 
 ## Features
 
@@ -16,6 +16,7 @@ A MATLAB prototype for screening diabetic retinopathy (DR) from retinal fundus i
 - Automatic screening report
 - Simulink resource model for a district-level screening workflow
 - Simple dashboard for uploading a fundus image and viewing the result
+- Optional TinyFish-powered online support (bring your own key): referral lookup, human-review evidence from PubMed / AIOS, and a PM-JAY empanelled eye-hospital locator
 
 ## Try it in your browser (no installation)
 
@@ -30,14 +31,18 @@ MATLAB Online availability of the required toolboxes depends on your MathWorks l
 
 1. Install MATLAB with the toolboxes listed below.
 2. Clone the repository:
-   ```bash
-   git clone https://github.com/Nitin-Shukla-eng/DR-Ishti-P.git
-   cd DR-Ishti-P
-   ```
+
+```
+git clone https://github.com/Nitin-Shukla-eng/DR-Ishti-P.git
+cd DR-Ishti-P
+```
+
 3. Open MATLAB in the cloned folder and run:
-   ```matlab
-   run_demo
-   ```
+
+```
+run_demo
+```
+
 4. Upload a fundus image from `sample_data/` (or your own) in the dashboard.
 
 ## Requirements
@@ -49,18 +54,25 @@ MATLAB Online availability of the required toolboxes depends on your MathWorks l
 - Statistics and Machine Learning Toolbox
 - Simulink (only for the workflow simulation)
 
-## Optional: referral lookup with TinyFish
+## Optional: TinyFish integration (bring your own key)
 
-For results that are not low risk, the dashboard can look up eye-care referral resources using the [TinyFish Search API](https://docs.tinyfish.ai/search-api). This is optional, and the app works fully without it.
+The dashboard can use [TinyFish](https://docs.tinyfish.ai) for three optional online features. **You supply your own API key**, so nothing is billed to the repo owner, and the app works fully without it.
 
-1. Create a free API key at [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys).
-2. In MATLAB, set the key for your session (never save it in a file in this repo):
-   ```matlab
-   setenv('TINYFISH_API_KEY', 'your-key-here')
-   ```
-3. Run `run_demo`, enter your city or district in the dashboard, and upload an image.
+| # | Feature | TinyFish API | Code |
+|---|---------|--------------|------|
+| 1 | Referral resources near the camp | Search | `src/getReferralInfo.m` |
+| 2 | **Human-review support:** PubMed / AIOS evidence for the clinical discordance behind a result | Search | `src/tinyfish/ishtiLiteratureCheck.m` |
+| 3 | **PM-JAY empanelled eye-hospital locator** (top 3 for the camp's district/pincode) | Agent | `src/tinyfish/ishtiFindPMJAYHospitals.m` |
 
-Privacy: only a generic text query (condition + city) is sent to TinyFish. No fundus images, patient details or screening results leave MATLAB. Always verify referral results before relying on them.
+**Setup**
+
+1. Create a free key at [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys).
+2. Either click **Set TinyFish API key** in the dashboard, or in MATLAB run `setenv('TINYFISH_API_KEY', 'your-key-here')`. The key lives only in your MATLAB session and is never written to a file in this repo.
+3. Run `run_demo`, enter the camp's district (and optionally state and pincode), and upload an image. Lookups run for results that are not low risk.
+
+To try the TinyFish features without the dashboard, run `demo_tinyfish`.
+
+**Privacy (zero PHI):** only a generic clinical-topic query and the camp's district / state / 6-digit pincode are sent to TinyFish. No fundus images, patient details or screening results leave MATLAB. Always verify results before relying on them. Agent runs on a government portal can be slow or fail; the app handles this and continues without them.
 
 ## Repository structure
 
@@ -68,10 +80,12 @@ Privacy: only a generic text query (condition + city) is sent to TinyFish. No fu
 DR-Ishti-P/
 ├── app/              Dashboard (DRScreeningApp.m)
 ├── src/              Pipeline: quality check, classifier, explainability, reporting, referral lookup
+│   └── tinyfish/     TinyFish helpers: key handling, Search/Agent wrappers, literature check, PM-JAY locator
 ├── models/           Trained classifier (dr_classifier_binary.mat)
 ├── simulink/         Screening workflow model builder
 ├── reports/          Sample test report
 ├── sample_data/      A few example fundus images for testing
+├── demo_tinyfish.m   Standalone demo of the TinyFish features
 ├── run_demo.m        Launches the dashboard
 └── DR-Ishti.prj      MATLAB project file
 ```
@@ -84,6 +98,8 @@ The model was trained on the [APTOS 2019 Blindness Detection](https://www.kaggle
 2. Place it in `data/APTOS/raw/`.
 3. Run `src/trainDRClassifier.m`.
 
+Retraining is **not** needed to use the TinyFish features; they do not touch the model.
+
 ## Results
 
 See `reports/test_report.png` and the figure above for the evaluation on the test set.
@@ -92,8 +108,10 @@ See `reports/test_report.png` and the figure above for the evaluation on the tes
 
 - Binary classification only (DR vs No DR), not full ICDR 0 to 4 grading.
 - Trained on a single public dataset, so performance on other cameras and populations is untested.
+- The TinyFish "discordance" topic is a proxy derived from the binary result and its confidence, not a full multi-module trust layer.
+- TinyFish lookups need internet and a valid key; results come from live web pages and must be verified.
 - Built as a one-day prototype and not clinically validated.
 
 ## Acknowledgements
 
-APTOS 2019 dataset (Asia Pacific Tele-Ophthalmology Society) and MathWorks tools used for development.
+APTOS 2019 dataset (Asia Pacific Tele-Ophthalmology Society), MathWorks tools used for development, and TinyFish for web search and agent APIs.
