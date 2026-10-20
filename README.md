@@ -54,7 +54,7 @@ run_demo
 - Statistics and Machine Learning Toolbox
 - Simulink (only for the workflow simulation)
 
-## Optional: TinyFish integration (bring your own key)
+## TinyFish integration (your API key)
 
 The dashboard can use [TinyFish](https://docs.tinyfish.ai) for three optional online features. **You supply your own API key**, so nothing is billed to the repo owner, and the app works fully without it.
 
