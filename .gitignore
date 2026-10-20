@@ -4,3 +4,13 @@ slprj/
 *.slxc
 data/
 resources/project/
+
+
+.env
+*.key
+tinyfish_key*.txt
+
+# MATLAB / Simulink junk
+*.autosave
+slprj/
+*.asv
