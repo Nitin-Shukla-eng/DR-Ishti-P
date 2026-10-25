@@ -7,6 +7,7 @@ A MATLAB prototype for screening diabetic retinopathy (DR) from retinal fundus i
 > **Disclaimer:** This is a research and educational prototype. It is not a medical device and must not be used for clinical diagnosis.
 
 [![Results](https://github.com/Nitin-Shukla-eng/DR-Ishti-P/raw/main/graph.png)](graph.png)
+[![Results](https://github.com/Nitin-Shukla-eng/DR-Ishti-P/raw/main/output.png)](output.png)
 
 ## Features
 
